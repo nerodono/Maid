@@ -39,6 +39,8 @@ library:
   default-extensions:
     - NamedFieldPuns
     - TupleSections
+  dependencies:
+    - containers
 
 executables:
   maid-exe:
@@ -51,6 +53,7 @@ executables:
     dependencies:
       - maid
       - pretty-simple
+      - optparse-applicative
 
 tests:
   maid-test:

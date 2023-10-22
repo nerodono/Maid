@@ -7,7 +7,7 @@ where
 -- Helpers that are exclusive for Tokenizer
 
 isValidOperator :: Char -> Bool
-isValidOperator = (`elem` "^*.>|<+-=")
+isValidOperator = (`elem` "^*.>|<+-=&$@")
 
 validIdentStarting :: [Char]
 validIdentStarting = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"

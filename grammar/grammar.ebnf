@@ -1,0 +1,12 @@
+<break> = "\n" | ";";
+
+<whitespace> = " " | "\n" | "\t";
+<whitespaces> = <whitespace> {<whitespaces>};
+
+<infixop> = "(" <compound_operator> ")";
+<infix_priority> = <number>;
+
+<infix_stmt>  = ("infixl"|"infixr") <whitespaces> <infixop> <whitespaces> <infix_priority> <break>
+              | ("infixl"|"infixr") <whitespaces> <expression> <whitespaces> "as" <infix_priority> <break>
+              ;
+

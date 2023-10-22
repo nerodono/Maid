@@ -16,14 +16,18 @@ data Keyword = Let
              | Else
              | End
              | Fn
-             deriving Show
+             | Infixl
+             | Infixr
+             | Mut
+             | Const
+             deriving(Show, Eq)
 
 data Bracket = Round
              | Curly
              | Square
-             deriving Show
+             deriving(Show, Eq)
 data BracketType = Open | Close
-                 deriving Show
+                 deriving(Show, Eq)
 
 data Token = TIdent String
            | TOperator String
