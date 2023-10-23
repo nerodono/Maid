@@ -2,6 +2,8 @@ module Maid.Parser.Mod
 ( expression
 , factor
 , defaultPrecedence
+, minPrecedence
+, maxPrecedence
 )
 where
 
@@ -26,6 +28,7 @@ import Maid.Parser.PrecedenceStore ( PrecMap
                                    , get
                                    , Precedence (..)
                                    , Associativity(..)
+                                   , maxPrec
                                    )
 
 type PResult = Either Error (Expr, [Spanned Token])
@@ -34,6 +37,12 @@ type Expected = Either Error [Spanned Token]
 
 defaultPrecedence :: Precedence
 defaultPrecedence = Precedence 4 LeftAssoc
+
+maxPrecedence :: Precedence
+maxPrecedence = Precedence 20 LeftAssoc
+
+minPrecedence :: Precedence
+minPrecedence = Precedence 0 LeftAssoc
 
 factor :: PrecMap -> [Spanned Token] -> PResult
 factor pmap (h:t) =
@@ -74,6 +83,32 @@ factor pmap (h:t) =
                   , ret_tail
                   )
 
+binary :: PrecMap -> Integer -> [Spanned Token] -> PResult
+binary pmap prec' tokens
+    | prec' == maxPrec' = do
+        (lhs_fact, t) <- factor pmap tokens
+        (Spanned op_span' operator, t') <- expectOperator t
+        let Precedence op_prec _ = getOr operator defaultPrecedence pmap
+        if op_prec /= prec' then
+            Right (lhs_fact, t)
+        else
+            proceedMaxPrec t' lhs_fact (Spanned op_span' operator)
+    | otherwise = do
+        (lhs_expr, t) <- nextBinary tokens
+        (Spanned op_span' operator, t') <- expectOperator t
+        (rhs_expr, t'') <- nextBinary t'
+
+        undefined
+    where maxPrec' = maxPrec pmap
+          nextPrec = prec' + 1
+          nextBinary = binary pmap nextPrec
+
+          proceedMaxPrec :: [Spanned Token] -> Expr -> Spanned String -> PResult
+          proceedMaxPrec tks lhs operator = do
+            (rhs_fact, t) <- factor pmap tks
+
+            undefined
+
 expectBracket :: Bracket -> BracketType -> [Spanned Token] -> Expected
 expectBracket bracket bracket_type (Spanned _ (TBracket b' bt'):t)
     | b' == bracket && bt' == bracket_type =
@@ -81,6 +116,13 @@ expectBracket bracket bracket_type (Spanned _ (TBracket b' bt'):t)
 expectBracket bracket bracket_type (h:_) =
     Left $ UnexpectedToken h (ExpectedBracket bracket bracket_type)
 expectBracket _ _ [] = Left Eof
+
+expectOperator :: [Spanned Token] -> Either Error (Spanned String, [Spanned Token])
+expectOperator (Spanned span' (TOperator operator):t) =
+    Right (Spanned span' operator, t)
+expectOperator (token:_) =
+    Left $ UnexpectedToken token (ExpectedOperator Nothing)
+expectOperator [] = Left Eof
 
 expectKeyword :: Keyword -> [Spanned Token] -> Expected
 expectKeyword kw (Spanned _ (TKeyword kw'):t) | kw == kw' = Right t 

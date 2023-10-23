@@ -14,6 +14,7 @@ import Maid.Tokenizer.Token ( Keyword
 data ExpectedToken = ExpectedLiteral
                    | ExpectedKeyword Keyword
                    | ExpectedBracket Bracket BracketType
+                   | ExpectedOperator (Maybe String)
                    deriving Show
 
 data Error = Eof
