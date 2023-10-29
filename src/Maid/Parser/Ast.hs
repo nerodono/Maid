@@ -5,10 +5,11 @@ module Maid.Parser.Ast
 , EBinary'(..)
 , EUnary'(..)
 , EIf'(..)
+, toSExpr
 )
 where
 
-import Maid.Tokenizer.Span ( Spanned )
+import Maid.Tokenizer.Span ( Spanned(..) )
 
 import qualified Maid.Tokenizer.Token as T
 
@@ -28,9 +29,18 @@ data EIf' = EIf' { cond :: Expr
                  }
           deriving Show
 
-data Expr = EBinary (Spanned EBinary')
-          | EUnary (Spanned EUnary')
+data Expr = EBinary EBinary'
+          | EUnary EUnary'
           | EIdent (Spanned String)
           | ELiteral (Spanned T.Literal)
           | EIf EIf'
           deriving Show
+
+toSExpr :: Expr -> String
+toSExpr (EBinary (EBinary' lhs rhs (Spanned _ op'))) =
+    "(" ++ op' ++ " " ++ toSExpr lhs ++ " " ++ toSExpr rhs ++ ")"
+toSExpr (ELiteral (Spanned _ lit)) =
+    case lit of
+        T.LInt i -> show i
+        _ -> error "Others are not covered currently"
+toSExpr _ = error "Unimplemented"

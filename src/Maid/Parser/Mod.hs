@@ -4,11 +4,13 @@ module Maid.Parser.Mod
 , defaultPrecedence
 , minPrecedence
 , maxPrecedence
+, binary
 )
 where
 
 import Data.Either ( fromRight )
 
+import Maid.Helpers ( rightToMaybe )
 import Maid.Tokenizer.Token ( Token(..)
                             , Keyword(..)
                             , Literal(..)
@@ -19,13 +21,13 @@ import Maid.Tokenizer.Span ( Spanned(..) )
 
 import Maid.Parser.Ast ( Expr(..)
                        , EIf'(..)
+                       , EBinary'(..)
                        )
 import Maid.Parser.Error ( Error(..)
                          , ExpectedToken (..)
                          )
 import Maid.Parser.PrecedenceStore ( PrecMap
                                    , getOr
-                                   , get
                                    , Precedence (..)
                                    , Associativity(..)
                                    , maxPrec
@@ -34,6 +36,10 @@ import Maid.Parser.PrecedenceStore ( PrecMap
 type PResult = Either Error (Expr, [Spanned Token])
 type SResult = Either Error Expr
 type Expected = Either Error [Spanned Token]
+
+type WhileFn = [Spanned Token] -> Maybe (Expr, [Spanned Token])
+type ExprReduce = Expr -> Expr -> Expr
+type ParseFn = (PrecMap -> [Spanned Token] -> PResult)
 
 defaultPrecedence :: Precedence
 defaultPrecedence = Precedence 4 LeftAssoc
@@ -85,29 +91,63 @@ factor pmap (h:t) =
 
 binary :: PrecMap -> Integer -> [Spanned Token] -> PResult
 binary pmap prec' tokens
-    | prec' == maxPrec' = do
-        (lhs_fact, t) <- factor pmap tokens
-        (Spanned op_span' operator, t') <- expectOperator t
-        let Precedence op_prec _ = getOr operator defaultPrecedence pmap
-        if op_prec /= prec' then
-            Right (lhs_fact, t)
-        else
-            proceedMaxPrec t' lhs_fact (Spanned op_span' operator)
-    | otherwise = do
-        (lhs_expr, t) <- nextBinary tokens
-        (Spanned op_span' operator, t') <- expectOperator t
-        (rhs_expr, t'') <- nextBinary t'
+    | prec' == maxPrec' = parseSingle factor
+    | otherwise = parseSingle (\_ tks -> binary pmap nextPrec tks)
 
-        undefined
     where maxPrec' = maxPrec pmap
           nextPrec = prec' + 1
-          nextBinary = binary pmap nextPrec
 
-          proceedMaxPrec :: [Spanned Token] -> Expr -> Spanned String -> PResult
-          proceedMaxPrec tks lhs operator = do
-            (rhs_fact, t) <- factor pmap tks
+          parseSingle :: ParseFn -> PResult
+          parseSingle fn = do
+            (lhs, t) <- fn pmap tokens
+            case expectOperator t of
+                Right (Spanned op_span' operator, t') -> do
+                    let Precedence op_prec _ = getOr operator defaultPrecedence pmap
+                    if op_prec /= prec' then
+                        Right (lhs, t)
+                    else
+                        proceedRhs fn lhs (Spanned op_span' operator) t'
+                Left _ -> Right (lhs, t)
 
-            undefined
+          proceedRhs :: ParseFn -> Expr -> Spanned String -> [Spanned Token] -> PResult
+          proceedRhs fn lhs op' tail' =
+            case assoc of
+                LeftAssoc  -> do
+                    (rhs, t) <- fn pmap tail'
+                    let reduced = reduceLAssoc op' lhs rhs
+                    while reduced (reduceLAssoc op') laCollect t
+
+                RightAssoc -> undefined
+            where Spanned _ op_str = op'
+                  Precedence _ assoc = getOr op_str defaultPrecedence pmap
+
+                  laCollect :: [Spanned Token] -> Maybe (Expr, [Spanned Token])
+                  laCollect tokens' = do
+                    (_, t') <- maybeSameOp $ expectOperator tokens'
+                    (rhs, t'') <- rightToMaybe $ fn pmap t'
+
+                    Just (rhs, t'')
+                
+                  maybeSameOp :: Either Error (Spanned String, [Spanned Token]) -> Maybe (Spanned String, [Spanned Token])
+                  maybeSameOp (Right (Spanned s o, tl'))| o == op_str =
+                    Just (Spanned s o, tl')
+                  maybeSameOp _ = Nothing
+
+          while :: Expr -> ExprReduce -> WhileFn -> [Spanned Token] -> PResult
+          while expr _ _ [] = Right (expr, [])
+          while expr reduce' fun tokens' =
+            case fun tokens' of
+                Just (expr', tail') ->
+                    while (reduce' expr expr') reduce' fun tail'
+                Nothing ->
+                    Right (expr, tokens')
+
+          reduceNonAssoc :: Spanned String -> Expr -> Expr -> Expr
+          reduceNonAssoc operator' lhs rhs =
+            EBinary $ EBinary' lhs rhs operator'
+
+          reduceLAssoc     = reduceNonAssoc
+          reduceRAssoc op' = flip $ reduceNonAssoc op'
 
 expectBracket :: Bracket -> BracketType -> [Spanned Token] -> Expected
 expectBracket bracket bracket_type (Spanned _ (TBracket b' bt'):t)
@@ -131,5 +171,5 @@ expectKeyword kw (token:_) =
 expectKeyword _ [] = Left Eof
 
 expression :: PrecMap -> [Spanned Token] -> PResult
-expression _ (h:t) = undefined
-expression _ [] = Left Eof
+expression pmap = parse
+    where parse = binary pmap 0
