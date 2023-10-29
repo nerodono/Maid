@@ -43,4 +43,6 @@ toSExpr (ELiteral (Spanned _ lit)) =
     case lit of
         T.LInt i -> show i
         _ -> error "Others are not covered currently"
+toSExpr (EIf (EIf' cond on_true on_false)) =
+    "(if " ++ toSExpr cond ++ " " ++ toSExpr on_true ++ " " ++ toSExpr on_false ++ ")"
 toSExpr _ = error "Unimplemented"

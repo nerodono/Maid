@@ -50,6 +50,8 @@ maxPrecedence = Precedence 20 LeftAssoc
 minPrecedence :: Precedence
 minPrecedence = Precedence 0 LeftAssoc
 
+-- Item with max precedence
+-- e.g. literals, expressions in brackets, if expressions and so on
 factor :: PrecMap -> [Spanned Token] -> PResult
 factor pmap (h:t) =
     case token of
@@ -89,14 +91,53 @@ factor pmap (h:t) =
                   , ret_tail
                   )
 
+-- parses binary expression
+-- this part is complex, so here's the explanation
+--
+-- the idea:
+--  Generalize recursive descent parser
+--
+-- Naive recursive descent parser of small grammar will look like this
+{-
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+number = digit { digit };
+
+factor     = number | "(" expression ")";
+term       = factor { "*" factor };
+expression = term { "+" term };
+-}
+-- This grammar will parse something like 2 + 2 * 2
+-- as (+ 2 (2 * 2))
+--  and (2 + 2) * 2
+-- as (* (+ 2 2) 2)
+--
+-- the idea here is that items with the highest precedence are lowest on the stack:
+-- expression
+-- |   +    |
+-- t        t
+-- --- * ----
+--  f      f
+--
+-- so, the term is multiple of factors and factor is number or expression in brackets
+--
+-- This function - generalization of that principle on the arbitrary number of operators
 binary :: PrecMap -> Integer -> [Spanned Token] -> PResult
 binary pmap prec' tokens
-    | prec' == maxPrec' = parseSingle factor
-    | otherwise = parseSingle (\_ tks -> binary pmap nextPrec tks)
+    | prec' == maxPrec' =
+        -- if we're on the max level of precedence
+        --  then it's time to parse factor
+        parseSingle factor
+    | otherwise =
+        -- otherwise we should parse binary expression with the
+        -- operands compound of higher precedence items.
+        -- eventually it gets on the max precedence level and parses `factor` (the first guard)
+        parseSingle (\_ tks -> binary pmap nextPrec tks)
 
     where maxPrec' = maxPrec pmap
           nextPrec = prec' + 1
 
+          -- Uses passed function to parse binary expression
+          -- ParseFn takes tokens and returns operand
           parseSingle :: ParseFn -> PResult
           parseSingle fn = do
             (lhs, t) <- fn pmap tokens
@@ -117,7 +158,7 @@ binary pmap prec' tokens
                     let reduced = reduceLAssoc op' lhs rhs
                     while reduced (reduceLAssoc op') laCollect t
 
-                RightAssoc -> undefined
+                RightAssoc -> undefined -- TODO
             where Spanned _ op_str = op'
                   Precedence _ assoc = getOr op_str defaultPrecedence pmap
 
@@ -133,6 +174,7 @@ binary pmap prec' tokens
                     Just (Spanned s o, tl')
                   maybeSameOp _ = Nothing
 
+          -- helper function that used to collect associative operations
           while :: Expr -> ExprReduce -> WhileFn -> [Spanned Token] -> PResult
           while expr _ _ [] = Right (expr, [])
           while expr reduce' fun tokens' =
