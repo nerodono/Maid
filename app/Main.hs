@@ -7,7 +7,10 @@ import Maid.Tokenizer.Mod ( tokenize )
 import qualified Maid.Parser.PrecedenceStore as PS
 
 import Maid.Parser.Ast ( toSExpr )
-import Maid.Parser.Mod ( binary, defaultPrecedence )
+import Maid.Parser.Mod ( binary
+                       , defaultPrecedence
+                       , rightAssocDefaultPrecedence
+                       )
 
 import Text.Pretty.Simple ( pPrint )
 import System.Environment ( getArgs, getExecutablePath )
@@ -23,7 +26,7 @@ executeFromFile path = do
 
     let pmap = PS.fromList [ ("+", defaultPrecedence)
                            , ("*", PS.mapPrecedence (+1) defaultPrecedence)
-                           , ("^", PS.mapPrecedence (+2) defaultPrecedence)
+                           , ("^", PS.mapPrecedence (+2) rightAssocDefaultPrecedence)
                            ]
     let data' = binary pmap 0 tokens
 

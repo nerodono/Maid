@@ -9,6 +9,7 @@ module Maid.Parser.PrecedenceStore
 , getOr
 , mapPrecedence
 , maxPrec
+, mapAssoc
 )
 where
 
@@ -27,6 +28,10 @@ data PrecMap = PrecMap (M.Map String Precedence) (S.Set Integer)
 
 mapPrecedence :: (Integer -> Integer) -> Precedence -> Precedence
 mapPrecedence f (Precedence prec' assoc') = Precedence (f prec') assoc'
+
+mapAssoc :: (Associativity -> Associativity) -> Precedence -> Precedence
+mapAssoc f (Precedence prec' assoc') =
+    Precedence prec' $ f assoc'
 
 empty :: PrecMap
 empty = PrecMap M.empty S.empty

@@ -5,6 +5,7 @@ module Maid.Parser.Mod
 , minPrecedence
 , maxPrecedence
 , binary
+, rightAssocDefaultPrecedence
 )
 where
 
@@ -31,6 +32,7 @@ import Maid.Parser.PrecedenceStore ( PrecMap
                                    , Precedence (..)
                                    , Associativity(..)
                                    , maxPrec
+                                   , mapAssoc
                                    )
 
 type PResult = Either Error (Expr, [Spanned Token])
@@ -43,6 +45,9 @@ type ParseFn = (PrecMap -> [Spanned Token] -> PResult)
 
 defaultPrecedence :: Precedence
 defaultPrecedence = Precedence 4 LeftAssoc
+
+rightAssocDefaultPrecedence :: Precedence
+rightAssocDefaultPrecedence = mapAssoc (const RightAssoc) defaultPrecedence
 
 maxPrecedence :: Precedence
 maxPrecedence = Precedence 20 LeftAssoc
@@ -156,11 +161,24 @@ binary pmap prec' tokens
                 LeftAssoc  -> do
                     (rhs, t) <- fn pmap tail'
                     let reduced = reduceLAssoc op' lhs rhs
-                    while reduced (reduceLAssoc op') laCollect t
+                    foldlExpr reduced reduce' laCollect t
 
-                RightAssoc -> undefined -- TODO
+                RightAssoc -> do
+                    (rhs, t)     <- fn pmap tail'
+                    (folded, t') <- foldrExpr rhs reduce' raCollect t
+
+                    Right (reduce' lhs folded , t')
             where Spanned _ op_str = op'
                   Precedence _ assoc = getOr op_str defaultPrecedence pmap
+
+                  reduce' = reduceLAssoc op'
+
+                  raCollect :: [Spanned Token] -> Maybe (Expr, [Spanned Token])
+                  raCollect tokens' = do
+                    (_, t') <- maybeSameOp $ expectOperator tokens'
+                    (rhs, t'') <- rightToMaybe $ fn pmap t'
+
+                    Just (rhs, t'')
 
                   laCollect :: [Spanned Token] -> Maybe (Expr, [Spanned Token])
                   laCollect tokens' = do
@@ -173,23 +191,28 @@ binary pmap prec' tokens
                   maybeSameOp (Right (Spanned s o, tl'))| o == op_str =
                     Just (Spanned s o, tl')
                   maybeSameOp _ = Nothing
+          
+          foldrExpr :: Expr -> ExprReduce -> WhileFn -> [Spanned Token] -> PResult
+          foldrExpr expr _ _ [] = Right (expr, [])
+          foldrExpr expr reduce' fun tokens' =
+            case fun tokens' of
+                Just (expr', tail') -> do
+                    (l, t) <- foldrExpr expr' reduce' fun tail'
 
-          -- helper function that used to collect associative operations
-          while :: Expr -> ExprReduce -> WhileFn -> [Spanned Token] -> PResult
-          while expr _ _ [] = Right (expr, [])
-          while expr reduce' fun tokens' =
+                    Right (reduce' expr l, t)
+
+          foldlExpr :: Expr -> ExprReduce -> WhileFn -> [Spanned Token] -> PResult
+          foldlExpr expr _ _ [] = Right (expr, [])
+          foldlExpr expr reduce' fun tokens' =
             case fun tokens' of
                 Just (expr', tail') ->
-                    while (reduce' expr expr') reduce' fun tail'
+                    foldlExpr (reduce' expr expr') reduce' fun tail'
                 Nothing ->
                     Right (expr, tokens')
 
-          reduceNonAssoc :: Spanned String -> Expr -> Expr -> Expr
-          reduceNonAssoc operator' lhs rhs =
+          reduceLAssoc :: Spanned String -> Expr -> Expr -> Expr
+          reduceLAssoc operator' lhs rhs =
             EBinary $ EBinary' lhs rhs operator'
-
-          reduceLAssoc     = reduceNonAssoc
-          reduceRAssoc op' = flip $ reduceNonAssoc op'
 
 expectBracket :: Bracket -> BracketType -> [Spanned Token] -> Expected
 expectBracket bracket bracket_type (Spanned _ (TBracket b' bt'):t)
