@@ -39,10 +39,13 @@ data Expr = EBinary EBinary'
 toSExpr :: Expr -> String
 toSExpr (EBinary (EBinary' lhs rhs (Spanned _ op'))) =
     "(" ++ op' ++ " " ++ toSExpr lhs ++ " " ++ toSExpr rhs ++ ")"
+toSExpr (EUnary (EUnary' (Spanned _ op') rhs)) =
+    "(" ++ op' ++ " " ++ toSExpr rhs ++ ")"
+toSExpr (EIdent (Spanned _ ident)) = ident
 toSExpr (ELiteral (Spanned _ lit)) =
     case lit of
         T.LInt i -> show i
         _ -> error "Others are not covered currently"
 toSExpr (EIf (EIf' cond on_true on_false)) =
     "(if " ++ toSExpr cond ++ " " ++ toSExpr on_true ++ " " ++ toSExpr on_false ++ ")"
-toSExpr _ = error "Unimplemented"
+-- toSExpr _ = error "Unimplemented"

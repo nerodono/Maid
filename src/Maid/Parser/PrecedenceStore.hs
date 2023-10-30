@@ -10,6 +10,8 @@ module Maid.Parser.PrecedenceStore
 , mapPrecedence
 , maxPrec
 , mapAssoc
+, binaryOp
+, unaryOp
 )
 where
 
@@ -23,8 +25,10 @@ data Associativity = LeftAssoc | RightAssoc
 
 data Precedence = Precedence Integer Associativity
                 deriving(Show, Eq, Ord)
+data OperatorArity = ArBinary | ArUnary
+                   deriving(Show, Eq, Ord)
 
-data PrecMap = PrecMap (M.Map String Precedence) (S.Set Integer)
+data PrecMap = PrecMap (M.Map (OperatorArity, String) Precedence) (S.Set Integer)
 
 mapPrecedence :: (Integer -> Integer) -> Precedence -> Precedence
 mapPrecedence f (Precedence prec' assoc') = Precedence (f prec') assoc'
@@ -33,15 +37,24 @@ mapAssoc :: (Associativity -> Associativity) -> Precedence -> Precedence
 mapAssoc f (Precedence prec' assoc') =
     Precedence prec' $ f assoc'
 
+withArity :: OperatorArity -> String -> (OperatorArity, String)
+withArity = (,)
+
+binaryOp :: String -> (OperatorArity, String)
+binaryOp = withArity ArBinary
+
+unaryOp :: String -> (OperatorArity, String)
+unaryOp = withArity ArUnary
+
 empty :: PrecMap
 empty = PrecMap M.empty S.empty
 
-fromList :: [(String, Precedence)] -> PrecMap
+fromList :: [((OperatorArity, String), Precedence)] -> PrecMap
 fromList l = PrecMap (M.fromList l) $ S.fromList precList
     where precList = extractPrec <$> l
           extractPrec (_, Precedence prec'' _) = prec''
 
-with :: String -> Precedence -> PrecMap -> PrecMap
+with :: (OperatorArity, String) -> Precedence -> PrecMap -> PrecMap
 with str precedence (PrecMap map' set') =
     PrecMap (M.insert str precedence map') (S.insert prec' set')
     where Precedence prec' _ = precedence
@@ -49,9 +62,9 @@ with str precedence (PrecMap map' set') =
 maxPrec :: PrecMap -> Integer
 maxPrec (PrecMap _ set') = maximum set'
 
-get :: String -> PrecMap -> Maybe Precedence
+get :: (OperatorArity, String) -> PrecMap -> Maybe Precedence
 get operator (PrecMap map' _) = M.lookup operator map'
 
-getOr :: String -> Precedence -> PrecMap -> Precedence
+getOr :: (OperatorArity, String) -> Precedence -> PrecMap -> Precedence
 getOr operator def (PrecMap map' _) =
     fromMaybe def (M.lookup operator map')

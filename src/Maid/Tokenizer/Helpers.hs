@@ -13,7 +13,7 @@ validIdentStarting :: [Char]
 validIdentStarting = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 
 validIdentRest :: [Char]
-validIdentRest = validIdentStarting ++ "'$!?"
+validIdentRest = validIdentStarting ++ "'$?!"
 
 
 isValidIdentStart :: Char -> Bool

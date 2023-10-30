@@ -55,6 +55,11 @@ collectPred predicate mapStr text =
 zeroAcc :: a -> (a, Integer)
 zeroAcc x = (x, 0)
 
+collectIdent :: Char -> String -> [Span.Spanned Token]
+collectIdent c =
+    collectPred isValidIdentRest f
+    where f = (, 1) . mapIdent . (c :)
+
 tokenize :: String -> [Span.Spanned Token]
 
 -- Integer literal
@@ -70,10 +75,15 @@ tokenize (c:t) | isValidOperator c =
     collectPred isValidOperator f (c:t)
     where f = zeroAcc . TOperator
 
+tokenize ('!':c:t) | isValidIdentStart c =
+    let (rest, tail', len) = takeWhile' isValidIdentRest t
+        ident = c : rest
+        operator = headSpan (TOperator ident) (len + 1)
+    in
+        operator : tokenizeAcc (len + 1) tail'
+
 -- Ident
-tokenize (c:t) | isValidIdentStart c =
-    collectPred isValidIdentRest f t
-    where f = (, 1) . mapIdent . (c :)
+tokenize (c:t) | isValidIdentStart c = collectIdent c t
 
 -- Brackets
 tokenize (c:t) | c == '(' = headSpan (TBracket Round Open)   1 : tokenizeNext t
@@ -82,6 +92,7 @@ tokenize (c:t) | c == '(' = headSpan (TBracket Round Open)   1 : tokenizeNext t
                | c == '}' = headSpan (TBracket Curly Close)  1 : tokenizeNext t
                | c == '[' = headSpan (TBracket Square Open)  1 : tokenizeNext t
                | c == ']' = headSpan (TBracket Square Close) 1 : tokenizeNext t
+
 
 -- String literal
 tokenize ('`':t) =

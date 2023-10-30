@@ -7,9 +7,9 @@ import Maid.Tokenizer.Mod ( tokenize )
 import qualified Maid.Parser.PrecedenceStore as PS
 
 import Maid.Parser.Ast ( toSExpr )
-import Maid.Parser.Mod ( binary
+import Maid.Parser.Mod ( expression
                        , defaultPrecedence
-                       , rightAssocDefaultPrecedence
+                       , maxPrecedence
                        )
 
 import Text.Pretty.Simple ( pPrint )
@@ -24,11 +24,11 @@ executeFromFile path = do
 
     let tokens = tokenize content
 
-    let pmap = PS.fromList [ ("+", defaultPrecedence)
-                           , ("*", PS.mapPrecedence (+1) defaultPrecedence)
-                           , ("^", PS.mapPrecedence (+2) rightAssocDefaultPrecedence)
+    let pmap = PS.fromList [ (PS.binaryOp "+", defaultPrecedence)
+                           , (PS.unaryOp "-", PS.mapPrecedence (flip (-) 2) maxPrecedence)
+                           , (PS.binaryOp "+", PS.mapPrecedence (+1) defaultPrecedence)
                            ]
-    let data' = binary pmap 0 tokens
+    let data' = expression pmap tokens
 
     case data' of
         Left e -> do

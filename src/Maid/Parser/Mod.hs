@@ -1,10 +1,8 @@
 module Maid.Parser.Mod
 ( expression
-, factor
 , defaultPrecedence
 , minPrecedence
 , maxPrecedence
-, binary
 , rightAssocDefaultPrecedence
 )
 where
@@ -23,6 +21,7 @@ import Maid.Tokenizer.Span ( Spanned(..) )
 import Maid.Parser.Ast ( Expr(..)
                        , EIf'(..)
                        , EBinary'(..)
+                       , EUnary'(..)
                        )
 import Maid.Parser.Error ( Error(..)
                          , ExpectedToken (..)
@@ -33,6 +32,8 @@ import Maid.Parser.PrecedenceStore ( PrecMap
                                    , Associativity(..)
                                    , maxPrec
                                    , mapAssoc
+                                   , binaryOp
+                                   , unaryOp
                                    )
 
 type PResult = Either Error (Expr, [Spanned Token])
@@ -131,29 +132,43 @@ binary pmap prec' tokens
     | prec' == maxPrec' =
         -- if we're on the max level of precedence
         --  then it's time to parse factor
-        parseSingle factor
+        parseSingleMaybeUnary factor
     | otherwise =
         -- otherwise we should parse binary expression with the
         -- operands compound of higher precedence items.
         -- eventually it gets on the max precedence level and parses `factor` (the first guard)
-        parseSingle (\_ tks -> binary pmap nextPrec tks)
+        parseSingleMaybeUnary (\_ tks -> binary pmap nextPrec tks)
 
     where maxPrec' = maxPrec pmap
           nextPrec = prec' + 1
 
           -- Uses passed function to parse binary expression
           -- ParseFn takes tokens and returns operand
-          parseSingle :: ParseFn -> PResult
-          parseSingle fn = do
-            (lhs, t) <- fn pmap tokens
+          parseSingleMaybeUnary :: ParseFn -> PResult
+          parseSingleMaybeUnary fn =
+            case un of
+                Right (Spanned span' operator, tail') ->
+                    let Precedence unary_prec _ = getOr (unaryOp operator) defaultPrecedence pmap
+                    in if unary_prec /= prec' then
+                            parseSingle tokens fn
+                        else do
+                            (rhs, tail'') <- parseSingle tail' fn
+                            Right (EUnary $ EUnary' (Spanned span' operator) rhs, tail'')
+                Left _ -> parseSingle tokens fn
+            where
+                un = expectOperator tokens
+
+          parseSingle :: [Spanned Token] -> ParseFn -> PResult
+          parseSingle tokens' fn = do
+            (lhs, t) <- fn pmap tokens'
             case expectOperator t of
-                Right (Spanned op_span' operator, t') -> do
-                    let Precedence op_prec _ = getOr operator defaultPrecedence pmap
-                    if op_prec /= prec' then
-                        Right (lhs, t)
-                    else
-                        proceedRhs fn lhs (Spanned op_span' operator) t'
-                Left _ -> Right (lhs, t)
+               Right (Spanned op_span' operator, t') -> do
+                   let Precedence op_prec _ = getOr (binaryOp operator) defaultPrecedence pmap
+                   if op_prec /= prec' then
+                       Right (lhs, t)
+                   else
+                       proceedRhs fn lhs (Spanned op_span' operator) t'
+               Left _ -> Right (lhs, t)
 
           proceedRhs :: ParseFn -> Expr -> Spanned String -> [Spanned Token] -> PResult
           proceedRhs fn lhs op' tail' =
@@ -161,27 +176,20 @@ binary pmap prec' tokens
                 LeftAssoc  -> do
                     (rhs, t) <- fn pmap tail'
                     let reduced = reduceLAssoc op' lhs rhs
-                    foldlExpr reduced reduce' laCollect t
+                    foldlExpr reduced reduce' assocCollect t
 
                 RightAssoc -> do
                     (rhs, t)     <- fn pmap tail'
-                    (folded, t') <- foldrExpr rhs reduce' raCollect t
+                    (folded, t') <- foldrExpr rhs reduce' assocCollect t
 
                     Right (reduce' lhs folded , t')
             where Spanned _ op_str = op'
-                  Precedence _ assoc = getOr op_str defaultPrecedence pmap
+                  Precedence _ assoc = getOr (binaryOp op_str) defaultPrecedence pmap
 
                   reduce' = reduceLAssoc op'
 
-                  raCollect :: [Spanned Token] -> Maybe (Expr, [Spanned Token])
-                  raCollect tokens' = do
-                    (_, t') <- maybeSameOp $ expectOperator tokens'
-                    (rhs, t'') <- rightToMaybe $ fn pmap t'
-
-                    Just (rhs, t'')
-
-                  laCollect :: [Spanned Token] -> Maybe (Expr, [Spanned Token])
-                  laCollect tokens' = do
+                  assocCollect :: [Spanned Token] -> Maybe (Expr, [Spanned Token])
+                  assocCollect tokens' = do
                     (_, t') <- maybeSameOp $ expectOperator tokens'
                     (rhs, t'') <- rightToMaybe $ fn pmap t'
 
@@ -238,3 +246,5 @@ expectKeyword _ [] = Left Eof
 expression :: PrecMap -> [Spanned Token] -> PResult
 expression pmap = parse
     where parse = binary pmap 0
+
+
