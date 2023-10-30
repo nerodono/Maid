@@ -20,4 +20,5 @@ data ExpectedToken = ExpectedLiteral
 data Error = Eof
            | UnexpectedToken (Spanned Token) ExpectedToken
            | UnexpectedKeyword (Spanned Keyword)
+           | UnmatchedClosingBracket
            deriving Show

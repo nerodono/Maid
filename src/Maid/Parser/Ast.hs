@@ -34,6 +34,7 @@ data Expr = EBinary EBinary'
           | EIdent (Spanned String)
           | ELiteral (Spanned T.Literal)
           | EIf EIf'
+          | EApply Expr Expr
           deriving Show
 
 toSExpr :: Expr -> String
@@ -48,4 +49,5 @@ toSExpr (ELiteral (Spanned _ lit)) =
         _ -> error "Others are not covered currently"
 toSExpr (EIf (EIf' cond on_true on_false)) =
     "(if " ++ toSExpr cond ++ " " ++ toSExpr on_true ++ " " ++ toSExpr on_false ++ ")"
--- toSExpr _ = error "Unimplemented"
+toSExpr (EApply lhs argument) =
+    "(@apply " ++ toSExpr lhs ++ " " ++ toSExpr argument ++ ")"

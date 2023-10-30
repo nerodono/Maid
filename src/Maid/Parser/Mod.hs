@@ -59,12 +59,14 @@ minPrecedence = Precedence 0 LeftAssoc
 -- Item with max precedence
 -- e.g. literals, expressions in brackets, if expressions and so on
 factor :: PrecMap -> [Spanned Token] -> PResult
+factor _ [] = Left Eof
 factor pmap (h:t) =
     case token of
         TKeyword kw -> handleKeyword kw
         TIdent ident -> (, t) <$> handleIdent ident
         TLiteral lit -> (, t) <$> handleLit lit
         TBracket Round Open -> handleRoundBracket
+        TBracket Round Close -> Left UnmatchedClosingBracket
 
         _ -> undefined
     where Spanned span' token = h
@@ -161,6 +163,7 @@ binary pmap prec' tokens
           parseSingle :: [Spanned Token] -> ParseFn -> PResult
           parseSingle tokens' fn = do
             (lhs, t) <- fn pmap tokens'
+
             case expectOperator t of
                Right (Spanned op_span' operator, t') -> do
                    let Precedence op_prec _ = getOr (binaryOp operator) defaultPrecedence pmap
@@ -168,6 +171,17 @@ binary pmap prec' tokens
                        Right (lhs, t)
                    else
                        proceedRhs fn lhs (Spanned op_span' operator) t'
+               Left _ | prec' == maxPrec' ->
+                    case fn pmap t of
+                        Right (argument, t'') ->
+                            let application = EApply lhs argument
+                                apply' tks =
+                                    case expectOperator tks of
+                                        Left _ -> rightToMaybe $ factor pmap tks
+                                        Right _ -> Nothing
+                            in
+                                foldlExpr application EApply apply' t''
+                        Left _ -> Right (lhs, t)
                Left _ -> Right (lhs, t)
 
           proceedRhs :: ParseFn -> Expr -> Spanned String -> [Spanned Token] -> PResult

@@ -32,16 +32,17 @@ isSkippableWhitespace :: Char -> Bool
 isSkippableWhitespace = (`elem` " \t")
 
 mapIdent :: String -> Token
-mapIdent "if"     = TKeyword If
-mapIdent "else"   = TKeyword Else
-mapIdent "then"   = TKeyword Then
-mapIdent "fn"     = TKeyword Fn
-mapIdent "end"    = TKeyword End
-mapIdent "let"    = TKeyword Let
-mapIdent "inxifr" = TKeyword Infixr
-mapIdent "infixl" = TKeyword Infixl
-mapIdent "mut"    = TKeyword Mut
-mapIdent "const"  = TKeyword Const
+mapIdent "if"       = TKeyword If
+mapIdent "else"     = TKeyword Else
+mapIdent "then"     = TKeyword Then
+mapIdent "fn"       = TKeyword Fn
+mapIdent "end"      = TKeyword End
+mapIdent "let"      = TKeyword Let
+mapIdent "inxifr"   = TKeyword Infixr
+mapIdent "infixl"   = TKeyword Infixl
+mapIdent "mut"      = TKeyword Mut
+mapIdent "const"    = TKeyword Const
+mapIdent "prefixop" = TKeyword Prefixop
 mapIdent o = TIdent o
 
 collectPred :: (Char -> Bool) -> (String -> (Token, Integer)) -> String -> [Span.Spanned Token]

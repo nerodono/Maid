@@ -20,6 +20,7 @@ data Keyword = Let
              | Infixr
              | Mut
              | Const
+             | Prefixop
              deriving(Show, Eq)
 
 data Bracket = Round
