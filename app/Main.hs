@@ -3,14 +3,12 @@ module Main
 where
 
 import Maid.Tokenizer.Mod ( tokenize )
+import Data.Maybe (fromJust)
 
 import qualified Maid.Parser.PrecedenceStore as PS
 
 import Maid.Parser.Ast ( toSExpr )
-import Maid.Parser.Mod ( expression
-                       , defaultPrecedence
-                       , maxPrecedence
-                       )
+import Maid.Parser.Expression ( expression )
 
 import Text.Pretty.Simple ( pPrint )
 import System.Environment ( getArgs, getExecutablePath )
@@ -22,24 +20,10 @@ executeFromFile path = do
     putStrLn "Expr: "
     putStrLn content
 
+    let precedences = PS.fromList [ (PS.binary "+", PS.leftAssoc 4)
+                                  , (PS.binary "*", PS.leftAssoc 5)
+                                  ]
     let tokens = tokenize content
-
-    let pmap = PS.fromList [ (PS.binaryOp "+", defaultPrecedence)
-                           , (PS.unaryOp "-", PS.mapPrecedence (flip (-) 2) maxPrecedence)
-                           , (PS.binaryOp "+", PS.mapPrecedence (+1) defaultPrecedence)
-                           ]
-    let data' = expression pmap tokens
-
-    case data' of
-        Left e -> do
-            putStrLn "Error:"
-            pPrint e
-        Right (r, t) -> do
-            putStrLn "Result: "
-            putStrLn $ toSExpr r
-
-            putStrLn "Tail: "
-            pPrint t
 
     pure ()
 

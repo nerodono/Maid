@@ -2,7 +2,7 @@ module Maid.Tokenizer.Token
 ( Token(..)
 , Literal(..)
 , Keyword(..)
-, Bracket(..)
+, BracketShape(..)
 , BracketType(..)
 )
 where
@@ -23,10 +23,10 @@ data Keyword = Let
              | Prefixop
              deriving(Show, Eq)
 
-data Bracket = Round
-             | Curly
-             | Square
-             deriving(Show, Eq)
+data BracketShape = Round
+                  | Curly
+                  | Square
+                  deriving(Show, Eq)
 data BracketType = Open | Close
                  deriving(Show, Eq)
 
@@ -34,6 +34,6 @@ data Token = TIdent String
            | TOperator String
            | TLiteral Literal
            | TKeyword Keyword
-           | TBracket Bracket BracketType
+           | TBracket BracketShape BracketType
            | TNewline
            deriving Show

@@ -2,6 +2,7 @@ module Maid.Helpers
 ( enumerate
 , takeWhile'
 , rightToMaybe
+, maybeToEither
 )
 where
 
@@ -17,3 +18,7 @@ takeWhile' _ xs = ([], xs, 0)
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe (Right r) = Just r
 rightToMaybe (Left _) = Nothing
+
+maybeToEither :: a -> Maybe b -> Either a b
+maybeToEither left Nothing = Left left
+maybeToEither _ (Just right) = Right right

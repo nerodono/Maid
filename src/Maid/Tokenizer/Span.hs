@@ -3,7 +3,9 @@ module Maid.Tokenizer.Span
 ( Span(..)
 , Spanned(..)
 , applyOffset
-, makeSpanned )
+, makeSpanned
+, unwrapSpanned
+)
 where
 
 data Span = Span { offset :: Integer, size :: Integer }
@@ -21,3 +23,9 @@ applyOffset acc spanned =
 
 makeSpanned :: a -> Integer -> Integer -> Spanned a
 makeSpanned value offset size = Spanned (Span offset size) value
+
+unwrapSpanned :: Spanned a -> a
+unwrapSpanned (Spanned _ v) = v
+
+instance Functor Spanned where
+    fmap f (Spanned s v) = Spanned s (f v)

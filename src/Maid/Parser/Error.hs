@@ -7,18 +7,18 @@ where
 import Maid.Tokenizer.Span ( Spanned )
 import Maid.Tokenizer.Token ( Keyword
                             , Token
-                            , Bracket
+                            , BracketShape
                             , BracketType
                             )
 
 data ExpectedToken = ExpectedLiteral
                    | ExpectedKeyword Keyword
-                   | ExpectedBracket Bracket BracketType
+                   | ExpectedBracket (Maybe (BracketShape, BracketType))
                    | ExpectedOperator (Maybe String)
                    deriving Show
 
 data Error = Eof
            | UnexpectedToken (Spanned Token) ExpectedToken
            | UnexpectedKeyword (Spanned Keyword)
-           | UnmatchedClosingBracket
+           | UnmatchedClosingBracket (Spanned BracketShape)
            deriving Show

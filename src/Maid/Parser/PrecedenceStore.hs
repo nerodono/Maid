@@ -1,70 +1,98 @@
 module Maid.Parser.PrecedenceStore
-( Associativity(..)
-, Precedence(..)
-, PrecMap
-, empty
+( Store
+, StoreTree
+, Arity(..)
+, Operator(..)
+, ary
+, unary
+, binary
 , fromList
-, with
-, get
-, getOr
-, mapPrecedence
-, maxPrec
-, mapAssoc
-, binaryOp
-, unaryOp
+, leftAssoc
+, rightAssoc
+, (<!!>)
+, splitMin
+, precedences
+, fromRoot
+, mapRoot
+, splitTree
+, root
 )
 where
 
-import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Bifunctor as Bi
+import qualified Data.Map       as M
 
-import Data.Maybe ( fromMaybe )
+type Scope = M.Map Integer Integer
 
 data Associativity = LeftAssoc | RightAssoc
                    deriving(Show, Eq, Ord)
-
-data Precedence = Precedence Integer Associativity
-                deriving(Show, Eq, Ord)
-data OperatorArity = ArBinary | ArUnary
+newtype Arity      = Arity Integer
+                   deriving(Show, Eq, Ord)
+newtype Operator   = Operator (String, Arity)
+                   deriving(Show, Eq, Ord)
+data Precedence    = Precedence { associativity :: Associativity
+                                , precedence    :: Integer
+                                }
                    deriving(Show, Eq, Ord)
 
-data PrecMap = PrecMap (M.Map (OperatorArity, String) Precedence) (S.Set Integer)
+(<!!>) :: (Integer -> Integer) -> Precedence -> Precedence
+(<!!>) f (Precedence assoc p) = Precedence assoc (f p)
 
-mapPrecedence :: (Integer -> Integer) -> Precedence -> Precedence
-mapPrecedence f (Precedence prec' assoc') = Precedence (f prec') assoc'
+leftAssoc :: Integer -> Precedence
+leftAssoc = Precedence LeftAssoc
 
-mapAssoc :: (Associativity -> Associativity) -> Precedence -> Precedence
-mapAssoc f (Precedence prec' assoc') =
-    Precedence prec' $ f assoc'
+rightAssoc :: Integer -> Precedence
+rightAssoc = Precedence RightAssoc
 
-withArity :: OperatorArity -> String -> (OperatorArity, String)
-withArity = (,)
+ary :: Integer -> String -> Operator
+ary arity repr = Operator (repr, Arity arity)
 
-binaryOp :: String -> (OperatorArity, String)
-binaryOp = withArity ArBinary
+unary :: String -> Operator
+unary = ary 1
 
-unaryOp :: String -> (OperatorArity, String)
-unaryOp = withArity ArUnary
+binary :: String -> Operator
+binary = ary 2
 
-empty :: PrecMap
-empty = PrecMap M.empty S.empty
+data Store = Store { inner       :: M.Map Operator Precedence
+                   , precedences :: Scope
+                   }
+           deriving Show
+data StoreTree = StoreTree { root       :: Store
+                           , scope      :: Scope } 
 
-fromList :: [((OperatorArity, String), Precedence)] -> PrecMap
-fromList l = PrecMap (M.fromList l) $ S.fromList precList
-    where precList = extractPrec <$> l
-          extractPrec (_, Precedence prec'' _) = prec''
+splitScope :: Scope -> Maybe (Integer, Scope)
+splitScope scope =
+    case M.keys scope of
+        [] -> Nothing
+        key:_ ->
+            let scope'    = M.updateWithKey f key scope
+                f _ v     = if v == 1 then Nothing else Just (v - 1)
+            in
+                Just (key, scope')
 
-with :: (OperatorArity, String) -> Precedence -> PrecMap -> PrecMap
-with str precedence (PrecMap map' set') =
-    PrecMap (M.insert str precedence map') (S.insert prec' set')
-    where Precedence prec' _ = precedence
+splitMin :: Store -> Maybe (Integer, Store)
+splitMin (Store inner precedences) =
+    Bi.second (Store inner) <$> splitScope precedences
 
-maxPrec :: PrecMap -> Integer
-maxPrec (PrecMap _ set') = maximum set'
+fromRoot :: Store -> StoreTree
+fromRoot (Store inner precedences) =
+    StoreTree (Store inner precedences) precedences
 
-get :: (OperatorArity, String) -> PrecMap -> Maybe Precedence
-get operator (PrecMap map' _) = M.lookup operator map'
+mapRoot :: (Store -> Store) -> StoreTree -> StoreTree
+mapRoot f (StoreTree root scope) =
+    StoreTree (f root) scope
 
-getOr :: (OperatorArity, String) -> Precedence -> PrecMap -> Precedence
-getOr operator def (PrecMap map' _) =
-    fromMaybe def (M.lookup operator map')
+splitTree :: StoreTree -> Maybe (Integer, StoreTree)
+splitTree (StoreTree root scope) =
+    Bi.second (StoreTree root) <$> splitScope scope
+
+fromList :: [(Operator, Precedence)] -> Store
+fromList list' =
+    let clamped     = Bi.second (max 0 <!!>) <$> list' -- clamp precedences to [0; +inf)
+        inner       = M.fromList clamped               -- create mapping of precedences
+        precedences = foldl f M.empty clamped          -- create index of precedences
+        f m item    =
+            let (_, Precedence _ p) = item
+            in M.insertWith (+) p 1 m
+    in
+        Store inner precedences

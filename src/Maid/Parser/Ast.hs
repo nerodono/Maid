@@ -13,9 +13,9 @@ import Maid.Tokenizer.Span ( Spanned(..) )
 
 import qualified Maid.Tokenizer.Token as T
 
-data EBinary' = EBinary' { lhs :: Expr
+data EBinary' = EBinary' { operator :: Spanned String
+                         , lhs :: Expr
                          , rhs :: Expr
-                         , operator :: Spanned String
                          }
               deriving Show
 data EUnary'  = EUnary' { operator :: Spanned String
@@ -38,7 +38,7 @@ data Expr = EBinary EBinary'
           deriving Show
 
 toSExpr :: Expr -> String
-toSExpr (EBinary (EBinary' lhs rhs (Spanned _ op'))) =
+toSExpr (EBinary (EBinary' (Spanned _ op') lhs rhs)) =
     "(" ++ op' ++ " " ++ toSExpr lhs ++ " " ++ toSExpr rhs ++ ")"
 toSExpr (EUnary (EUnary' (Spanned _ op') rhs)) =
     "(" ++ op' ++ " " ++ toSExpr rhs ++ ")"

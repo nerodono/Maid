@@ -9,7 +9,7 @@ import qualified Maid.Tokenizer.Span as Span
 import Maid.Tokenizer.Token ( Token(..)
                             , Literal(..)
                             , Keyword(..)
-                            , Bracket(..)
+                            , BracketShape(..)
                             , BracketType(..)
                             )
 import Maid.Tokenizer.Helpers ( isValidOperator
