@@ -28,14 +28,16 @@ type Fallible a = Either Error a
 type FallibleTailed  a = Either Error (a, [Spanned Token])
 type FallibleTailedS a = Either Error (Spanned a, [Spanned Token])
 
-factor :: P.StoreTree -> [Spanned Token] -> FallibleTailed Expr
+factor :: P.Store -> [Spanned Token] -> FallibleTailed Expr
 factor tree (h:t) =
     case bare_token of
         TLiteral lit ->
             Right ( ELiteral $ withSpan lit
                   , t )
         TBracket Round Open -> do
-            (expr, t') <- expression tree t
+            -- fromRoot call here needed to restore original
+            -- precedence map
+            (expr, t') <- expression (P.fromRoot tree) t
             (b, t'') <- expectBracket t'
 
             _ <- filterExact Round Close b
@@ -56,7 +58,7 @@ expression tree =
         Just (current_precedence, whats_left) ->
             parse $ expression whats_left
         Nothing ->
-            factor tree
+            factor $ P.root tree
     where
         parse :: ParseF -> [Spanned Token] -> FallibleTailed Expr
         parse parse' tokens =
