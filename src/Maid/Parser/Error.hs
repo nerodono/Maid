@@ -4,12 +4,14 @@ module Maid.Parser.Error
 )
 where
 
-import Maid.Tokenizer.Span ( Spanned )
+import Maid.Tokenizer.Span ( Spanned, Span )
 import Maid.Tokenizer.Token ( Keyword
                             , Token
                             , BracketShape
                             , BracketType
                             )
+
+import qualified Maid.Parser.PrecedenceStore as P
 
 data ExpectedToken = ExpectedLiteral
                    | ExpectedKeyword Keyword
@@ -21,4 +23,5 @@ data Error = Eof
            | UnexpectedToken (Spanned Token) ExpectedToken
            | UnexpectedKeyword (Spanned Keyword)
            | UnmatchedClosingBracket (Spanned BracketShape)
+           | UnknownOperator P.Operator Span
            deriving Show

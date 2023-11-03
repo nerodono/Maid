@@ -3,6 +3,8 @@ module Maid.Parser.PrecedenceStore
 , StoreTree
 , Arity(..)
 , Operator(..)
+, Precedence(..)
+, Associativity(..)
 , ary
 , unary
 , binary
@@ -16,8 +18,12 @@ module Maid.Parser.PrecedenceStore
 , mapRoot
 , splitTree
 , root
+, lookup
+, executeRoot
 )
 where
+
+import Prelude hiding ( lookup )
 
 import qualified Data.Bifunctor as Bi
 import qualified Data.Map       as M
@@ -74,6 +80,14 @@ splitMin :: Store -> Maybe (Integer, Store)
 splitMin (Store inner precedences) =
     Bi.second (Store inner) <$> splitScope precedences
 
+lookup :: Operator -> Store -> Maybe Precedence
+lookup operator (Store inner _) =
+    M.lookup operator inner
+
+executeRoot :: (Store -> a) -> StoreTree -> a
+executeRoot f (StoreTree root _) =
+    f root
+
 fromRoot :: Store -> StoreTree
 fromRoot (Store inner precedences) =
     StoreTree (Store inner precedences) precedences
@@ -88,9 +102,8 @@ splitTree (StoreTree root scope) =
 
 fromList :: [(Operator, Precedence)] -> Store
 fromList list' =
-    let clamped     = Bi.second (max 0 <!!>) <$> list' -- clamp precedences to [0; +inf)
-        inner       = M.fromList clamped               -- create mapping of precedences
-        precedences = foldl f M.empty clamped          -- create index of precedences
+    let inner       = M.fromList list'               -- create mapping of precedences
+        precedences = foldl f M.empty list'          -- create index of precedences
         f m item    =
             let (_, Precedence _ p) = item
             in M.insertWith (+) p 1 m

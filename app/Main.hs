@@ -3,7 +3,6 @@ module Main
 where
 
 import Maid.Tokenizer.Mod ( tokenize )
-import Data.Maybe (fromJust)
 
 import qualified Maid.Parser.PrecedenceStore as PS
 
@@ -20,10 +19,24 @@ executeFromFile path = do
     putStrLn "Expr: "
     putStrLn content
 
-    let precedences = PS.fromList [ (PS.binary "+", PS.leftAssoc 4)
-                                  , (PS.binary "*", PS.leftAssoc 5)
+    let precedences = PS.fromList [ (PS.binary "+", PS.leftAssoc  4)
+                                  , (PS.binary "-", PS.leftAssoc  4)
+                                  , (PS.binary "*", PS.leftAssoc  5)
+                                  , (PS.binary "^", PS.leftAssoc 7)
+                                  , (PS.unary  "-", PS.leftAssoc  6)
                                   ]
     let tokens = tokenize content
+    let parsed = expression (PS.fromRoot precedences) tokens
+
+    case parsed of
+        Right (result, tail') -> do
+            putStrLn "Result:"
+            putStrLn $ toSExpr result
+            putStrLn "Tail:"
+            pPrint tail'
+        Left err -> do
+            putStrLn "Error:"
+            pPrint err
 
     pure ()
 

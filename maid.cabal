@@ -31,7 +31,6 @@ library
       Maid.Parser.Expression
       Maid.Parser.Helpers
       Maid.Parser.PrecedenceStore
-      Maid.Parser.ScopedStore
       Maid.Tokenizer.Helpers
       Maid.Tokenizer.Mod
       Maid.Tokenizer.Span
